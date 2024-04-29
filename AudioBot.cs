@@ -17,7 +17,7 @@ using TSLib.Full;
 using NeteaseCloudMusicApi;
 using QQMusicApi;
 
-public class YunPlugin : IBotPlugin 
+public class AudioPlugin : IBotPlugin 
 {
     //===========================================初始化===========================================
     static IConfigSource MyIni;
@@ -29,8 +29,10 @@ public class YunPlugin : IBotPlugin
     public static int playMode;
     public static string neteaseMusicAPI;
     public static string qqMusicAPI;
+    public static string qq;
     public static string UNM_Address;
     List<long> playlist = new List<long>();
+    List<string> qqplayList = new List<string>();
     public static int Playlocation = 0;
     private readonly SemaphoreSlim playlock = new SemaphoreSlim(1, 1);
     private readonly SemaphoreSlim Listeninglock = new SemaphoreSlim(1, 1);
@@ -41,7 +43,7 @@ public class YunPlugin : IBotPlugin
         if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
         {
             Console.WriteLine("运行在Windows环境.");
-            iniFilePath = "plugins/YunSettings.ini"; // Windows 文件目录
+            iniFilePath = "plugins/Settings.ini"; // Windows 文件目录
         }
         else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
         {
@@ -83,13 +85,19 @@ public class YunPlugin : IBotPlugin
 
         string qqCookieValue = MyIni.Configs["MusicBot"].Get("qqCookie");
         qqCookies = string.IsNullOrEmpty(qqCookieValue) ? "" : qqCookieValue;
+        
+        string qqUin = MyIni.Configs["MusicBot"].Get("qq");
+        qq = string.IsNullOrEmpty(qqUin) ? "" : qqUin;
 
-        Console.WriteLine(playMode);
-        Console.WriteLine(neteaseCookies);
-        Console.WriteLine(neteaseMusicAPI);
+ 
+
+        Console.WriteLine("播放模式：" + playMode);
+        Console.WriteLine("网抑云COOKIE：" + neteaseCookies);
+        Console.WriteLine("网易云音乐API：" + neteaseMusicAPI);
         Console.WriteLine(UNM_Address);
-        Console.WriteLine(qqCookies);
-        Console.WriteLine(qqMusicAPI);
+        Console.WriteLine("QQ音乐COOKIE：" + qqCookies);
+        Console.WriteLine("QQ音乐API：" + qqMusicAPI);
+        Console.WriteLine("QQ号：" + qq);
 
 
     }
@@ -257,39 +265,34 @@ public class YunPlugin : IBotPlugin
     [Command("qq gd")]
     public async Task<string> CommandQQGeDan(string arguments, PlayManager playManager, InvokerData invoker, Ts3Client ts3Client, Player player)
     {
-        playlist.Clear();
+        qqplayList.Clear();
         SetInvoker(invoker);
         SetPlplayManager(playManager);
         SetTs3Client(ts3Client);
         string urlSearch = $"{qqMusicAPI}/songlist?id={arguments}";
         string searchJson = await HttpGetAsync(urlSearch);
         RootObject gedanDetail = JsonSerializer.Deserialize<RootObject>(searchJson);
-        string gedanshuliang = gedanDetail.data.songnum.ToString();
-        _ = ts3Client.SendChannelMessage($"歌单共{gedanshuliang}首歌曲，正在添加到播放列表,请稍后。");
-        int loopCount = -1;
-        for (int i = 0; i < gedanDetail.data.songnum; i += 50)
+        Console.WriteLine(gedanDetail.Result);
+        if(gedanDetail.Result == 100)
         {
-            Console.WriteLine($"查询循环次数{loopCount + 1}");
-            loopCount += 1;
-            if (i + 50 > gedanDetail.data.songnum)
+            string gedanshuliang = gedanDetail.Data.Songnum.ToString();
+            _ = ts3Client.SendChannelMessage($"歌单共{gedanshuliang}首歌曲，正在添加到播放列表,请稍后。");
+            for (int i = 0; i < gedanDetail.Data.Songnum; i++)
             {
-                // 如果歌单的歌曲数量小于50，那么查询的数量就是歌曲的数量，否则查询的数量就是歌曲的数量减去50乘以查询的次数
-                i = gedanDetail.data.songnum < 50 ? gedanDetail.data.songnum : gedanDetail.data.songnum - 50 * loopCount;
-                // 构建查询URL，如果歌单的歌曲数量小于50，那么偏移量就是0，否则偏移量就是查询的数量
-                int offset = gedanDetail.data.songnum < 50 ? 0 : i;
-                urlSearch = $"{neteaseMusicAPI}/playlist/track/all?id={arguments}&limit=50&offset={offset}";
-                searchJson = await HttpGetAsync(urlSearch);
-                GeDan geDan1 = JsonSerializer.Deserialize<GeDan>(searchJson);
-                for (int j = 0; j < i; j++)
-                {
-                    playlist.Add(geDan1.songs[j].id);
-                    Console.WriteLine(geDan1.songs[j].id);
-                }
-                break;
+                string songid = gedanDetail.Data.Songlist[i].Songmid;
+                qqplayList.Add(songid);
+                Console.WriteLine(songid);
+                Playlocation = 0;
+
             }
+
+            return $"播放列表加载完成,已加载{qqplayList.Count}首歌";
+        }
+        else
+        {
+            return "歌单获取错误";
         }
 
-        return $"播放列表加载完成,已加载{playlist.Count}首歌";
     }
     //===========================================歌单播放===========================================
 
@@ -350,6 +353,8 @@ public class YunPlugin : IBotPlugin
             _ = ts3Client.SendChannelMessage("已停止播放");
         }
     }
+
+    // netease music
     private async Task ProcessSong(long id, Ts3Client ts3Client, PlayManager playManager, InvokerData invoker)
     {
         await playlock.WaitAsync();
@@ -406,6 +411,72 @@ public class YunPlugin : IBotPlugin
         }
     }
     //===========================================播放逻辑===========================================
+    // qq music
+    private async Task PlaySongs(string id, Ts3Client ts3Client, PlayManager playManager, InvokerData invoker)
+    {
+        await playlock.WaitAsync();
+        string MusicUrl = "error";
+        try
+        {
+            string musicId = id;
+            string musicCheckUrl = $"{qqMusicAPI}/song?songmid={musicId}";
+            string searchMusicCheckJson = await HttpGetAsync(musicCheckUrl);
+            var trackUrlResponse = JsonSerializer.Deserialize<TrackUrlResponse>(searchMusicCheckJson);
+            // 获取播放URL
+            if (trackUrlResponse != null && trackUrlResponse.Result == 100)
+            {
+                foreach (var item in trackUrlResponse.Data)
+                {
+                    MusicUrl = item.Key;
+                    Console.WriteLine($"Key: {item.Key}, URL: {item.Value}");
+                }
+                Console.WriteLine($"Result: {trackUrlResponse.Result}");
+            }
+
+            // 构造获取音乐详情的URL
+            string musicDetailUrl = $"{qqMusicAPI}/song?songmid={musicId}";
+            string musicDetailJson = await HttpGetAsync(musicDetailUrl);
+            Root musicDetail = JsonSerializer.Deserialize<Root>(musicDetailJson);
+            // 从音乐详情中获取音乐图片URL和音乐名称
+            string mid = musicDetail.Data2.TrackInfo.Album.Mid;
+            string musicImgUrl = $"https://y.gtimg.cn/music/photo_new/T002R300x300M000{mid}.jpg";
+            string musicName = musicDetail.Data2.TrackInfo.Name;
+            Console.WriteLine($"歌曲id：{musicId}，歌曲名称：{musicName}");
+            // 设置Bot的头像为音乐图片
+            _ = MainCommands.CommandBotAvatarSet(ts3Client, musicImgUrl);
+
+            // 设置Bot的描述为音乐名称
+            _ = MainCommands.CommandBotDescriptionSet(ts3Client, musicName);
+
+            // 在控制台输出音乐播放URL
+            Console.WriteLine(MusicUrl);
+
+            // 如果音乐播放URL不是错误，则添加到播放列表并通知频道
+            if (MusicUrl != "error")
+            {
+                _ = MainCommands.CommandPlay(playManager, invoker, MusicUrl);
+
+                // 更新Bot的描述为当前播放的音乐名称
+                _ = MainCommands.CommandBotDescriptionSet(ts3Client, musicName);
+
+                // 发送消息到频道，通知正在播放的音乐
+                if (qqplayList.Count == 0)
+                {
+                    _ = ts3Client.SendChannelMessage($"正在播放：{musicName}");
+                }
+                else
+                {
+                    _ = ts3Client.SendChannelMessage($"正在播放第{Playlocation + 1}首：{musicName}");
+                }
+            }
+
+        }
+        finally
+        {
+
+        }
+    }
+
 
     //===========================================登录部分===========================================
     [Command("yun login")]
@@ -472,7 +543,7 @@ public class YunPlugin : IBotPlugin
     {
         string result;
         string url = qqMusicAPI + "/user/setCookie";
-        string qqCookie = Cookie2Json(qqCookies);
+        string qqCookie = await Cookie2Json(qqCookies);
         Console.WriteLine(qqCookie);
         Console.WriteLine("开始QQ登录");
         try
@@ -502,6 +573,13 @@ public class YunPlugin : IBotPlugin
                     if(status == 100)
                     {
                         Console.WriteLine(data);
+                        string setCookieApi = qqMusicAPI + "/user/getCookie?id=" + qq;
+                        string setCookie = await HttpGetAsync(setCookieApi);
+                        CookieStatus cookieStatus = JsonSerializer.Deserialize<CookieStatus>(setCookie);
+                        if(cookieStatus.Status == 100 && cookieStatus.Message == "设置 cookie 成功")
+                        {
+                            result = cookieStatus.Message;
+                        }
                     }
                     else
                     {
@@ -665,7 +743,7 @@ public class YunPlugin : IBotPlugin
     }
 
     //===========================================QQ相关==================================
-    public static string Cookie2Json(string cookie)
+    public static async Task<string> Cookie2Json(string cookie)
     {
         var cookieData = new { data = cookie };
         string json = JsonSerializer.Serialize(cookieData);
