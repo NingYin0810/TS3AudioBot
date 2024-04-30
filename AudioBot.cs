@@ -27,6 +27,7 @@ public class AudioPlugin : IBotPlugin
     public static string neteaseCookies;
     public static string qqCookies;
     public static int playMode;
+    public static string songPlat;
     public static string neteaseMusicAPI;
     public static string qqMusicAPI;
     public static string qq;
@@ -258,7 +259,7 @@ public class AudioPlugin : IBotPlugin
         _ = ProcessSong(playlist[0], ts3Client, playManager, invoker);
         Console.WriteLine($"歌单共{playlist.Count}首歌");
         await Listeninglock.WaitAsync();
-        playManager.ResourceStopped += async (sender, e) => await SongPlayMode(playManager, invoker, ts3Client);
+        playManager.ResourceStopped += async (sender, e) => await SongPlayMode(playManager, invoker, ts3Client, "netease");
         return $"播放列表加载完成,已加载{playlist.Count}首歌";
     }
 
@@ -282,10 +283,12 @@ public class AudioPlugin : IBotPlugin
                 string songid = gedanDetail.Data.Songlist[i].Songmid;
                 qqplayList.Add(songid);
                 Console.WriteLine(songid);
-                Playlocation = 0;
-
             }
-
+            Playlocation = 0;
+            _ = PlaySongs(qqplayList[0], ts3Client, playManager, invoker);
+            Console.WriteLine($"歌单共{playlist.Count}首歌");
+            await Listeninglock.WaitAsync();
+            playManager.ResourceStopped += async (sender, e) => await SongPlayMode(playManager, invoker, ts3Client, "qq");
             return $"播放列表加载完成,已加载{qqplayList.Count}首歌";
         }
         else
@@ -300,7 +303,7 @@ public class AudioPlugin : IBotPlugin
     [Command("yun next")]
     public async Task CommandYunNext(PlayManager playManager, InvokerData invoker, Ts3Client ts3Client)
     {
-        await SongPlayMode(playManager, invoker, ts3Client);
+        await SongPlayMode(playManager, invoker, ts3Client, "netease");
     }
     //===========================================下一曲=============================================
     [Command("yun stop")]
@@ -311,48 +314,105 @@ public class AudioPlugin : IBotPlugin
     }
 
     //===========================================播放逻辑===========================================
-    private async Task SongPlayMode(PlayManager playManager, InvokerData invoker, Ts3Client ts3Client)
+    private async Task SongPlayMode(PlayManager playManager, InvokerData invoker, Ts3Client ts3Client, string songPlat)
     {
-        try
+        if (songPlat == "netease")
         {
-            switch (playMode)
+            List<long> playList = new List<long>();
+            playList = playlist;
+            try
             {
-                case 0: //顺序播放
-                    Playlocation += 1;
-                    await ProcessSong(playlist[Playlocation], ts3Client, playManager, invoker);
-                    break;
-                case 1:  //顺序循环
-                    if (Playlocation == playlist.Count - 1)
-                    {
-                        Playlocation = 0;
-                        await ProcessSong(playlist[Playlocation], ts3Client, playManager, invoker);
-                    }
-                    else
-                    {
+
+                switch (playMode)
+                {
+                    case 0: //顺序播放
                         Playlocation += 1;
-                        await ProcessSong(playlist[Playlocation], ts3Client, playManager, invoker);
-                    }
-                    break;
-                case 2:  //随机播放
-                    Random random = new Random();
-                    Playlocation = random.Next(0, playlist.Count);
-                    await ProcessSong(playlist[Playlocation], ts3Client, playManager, invoker);
-                    break;
-                case 3:  //随机循环
-                    Random random1 = new Random();
-                    Playlocation = random1.Next(0, playlist.Count);
-                    await ProcessSong(playlist[Playlocation], ts3Client, playManager, invoker);
-                    break;
-                default:
-                    break;
-            } 
+                        await ProcessSong(playList[Playlocation], ts3Client, playManager, invoker);
+                        break;
+                    case 1:  //顺序循环
+                        if (Playlocation == playList.Count - 1)
+                        {
+                            Playlocation = 0;
+                            await ProcessSong(playList[Playlocation], ts3Client, playManager, invoker);
+                        }
+                        else
+                        {
+                            Playlocation += 1;
+                            await ProcessSong(playList[Playlocation], ts3Client, playManager, invoker);
+                        }
+                        break;
+                    case 2:  //随机播放
+                        Random random = new Random();
+                        Playlocation = random.Next(0, playList.Count);
+                        await ProcessSong(playList[Playlocation], ts3Client, playManager, invoker);
+                        break;
+                    case 3:  //随机循环
+                        Random random1 = new Random();
+                        Playlocation = random1.Next(0, playList.Count);
+                        await ProcessSong(playList[Playlocation], ts3Client, playManager, invoker);
+                        break;
+                    default:
+                        break;
+                }
+            }
+            catch (Exception)
+            {
+                Console.WriteLine("播放列表已空");
+                _ = ts3Client.SendChannelMessage("已停止播放");
+            }
         }
-        catch (Exception)
+        else
         {
-            Console.WriteLine("播放列表已空");
-            _ = ts3Client.SendChannelMessage("已停止播放");
+            List<string> playList = new List<string>();
+            playList = qqplayList;
+            try
+            {
+
+                switch (playMode)
+                {
+                    case 0: //顺序播放
+                        Playlocation += 1;
+                        await PlaySongs(playList[Playlocation], ts3Client, playManager, invoker);
+                        break;
+                    case 1:  //顺序循环
+                        if (Playlocation == playList.Count - 1)
+                        {
+                            Playlocation = 0;
+                            await PlaySongs(playList[Playlocation], ts3Client, playManager, invoker);
+                        }
+                        else
+                        {
+                            Playlocation += 1;
+                            await PlaySongs(playList[Playlocation], ts3Client, playManager, invoker);
+                        }
+                        break;
+                    case 2:  //随机播放
+                        Random random = new Random();
+                        Playlocation = random.Next(0, playList.Count);
+                        await PlaySongs(playList[Playlocation], ts3Client, playManager, invoker);
+                        break;
+                    case 3:  //随机循环
+                        Random random1 = new Random();
+                        Playlocation = random1.Next(0, playList.Count);
+                        await PlaySongs(playList[Playlocation], ts3Client, playManager, invoker);
+                        break;
+                    default:
+                        break;
+                }
+            }
+            catch (Exception)
+            {
+                Console.WriteLine("播放列表已空");
+                _ = ts3Client.SendChannelMessage("已停止播放");
+            }
         }
+        
     }
+
+/*    private async Task ProcessSong(object value, Ts3Client ts3Client, PlayManager playManager, InvokerData invoker)
+    {
+        throw new NotImplementedException();
+    }*/
 
     // netease music
     private async Task ProcessSong(long id, Ts3Client ts3Client, PlayManager playManager, InvokerData invoker)
