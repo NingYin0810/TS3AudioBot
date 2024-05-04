@@ -62,7 +62,7 @@ public class AudioPlugin : IBotPlugin
             }
 
             string location = Path.GetDirectoryName(Assembly.GetEntryAssembly().Location);
-            iniFilePath = File.Exists(dockerEnvFilePath) ? location + "/data/plugins/YunSettings.ini" : location + "/plugins/YunSettings.ini";
+            iniFilePath = File.Exists(dockerEnvFilePath) ? location + "/data/plugins/Settings.ini" : location + "/plugins/Settings.ini";
         }
         else
         {
