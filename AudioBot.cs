@@ -17,7 +17,7 @@ using TSLib.Full;
 using NeteaseCloudMusicApi;
 using QQMusicApi;
 
-public class AudioPlugin : IBotPlugin 
+public class AudioPlugin : IBotPlugin
 {
     //===========================================初始化===========================================
     static IConfigSource MyIni;
@@ -37,10 +37,12 @@ public class AudioPlugin : IBotPlugin
     public static int Playlocation = 0;
     private readonly SemaphoreSlim playlock = new SemaphoreSlim(1, 1);
     private readonly SemaphoreSlim Listeninglock = new SemaphoreSlim(1, 1);
+    private readonly SemaphoreSlim QQplaylock = new SemaphoreSlim(1, 1);
+    private readonly SemaphoreSlim QQListeninglock = new SemaphoreSlim(1, 1);
     public void Initialize()
     {
         string iniFilePath;
-        
+
         if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
         {
             Console.WriteLine("运行在Windows环境.");
@@ -86,11 +88,11 @@ public class AudioPlugin : IBotPlugin
 
         string qqCookieValue = MyIni.Configs["MusicBot"].Get("qqCookie");
         qqCookies = string.IsNullOrEmpty(qqCookieValue) ? "" : qqCookieValue;
-        
+
         string qqUin = MyIni.Configs["MusicBot"].Get("qq");
         qq = string.IsNullOrEmpty(qqUin) ? "" : qqUin;
 
- 
+
 
         Console.WriteLine("播放模式：" + playMode);
         Console.WriteLine("网抑云COOKIE：" + neteaseCookies);
@@ -103,7 +105,7 @@ public class AudioPlugin : IBotPlugin
 
     }
 
-    
+
 
     public void SetPlplayManager(PlayManager playManager)
     {
@@ -133,9 +135,15 @@ public class AudioPlugin : IBotPlugin
     {
         return tempts3Client;
     }
-    
+
     //===========================================初始化===========================================
 
+    //重载命令，待测试
+/*    [Command("reload")]
+    public void Reload()
+    {
+        Initialize();
+    }*/
 
     //===========================================播放模式===========================================
     [Command("yun mode")]
@@ -230,10 +238,10 @@ public class AudioPlugin : IBotPlugin
         int loopCount = -1;
         for (int i = 0; i < gedanDetail.playlist.trackCount; i += 50)
         {
-            Console.WriteLine($"查询循环次数{loopCount+1}");
+            Console.WriteLine($"查询循环次数{loopCount + 1}");
             loopCount += 1;
             if (i + 50 > gedanDetail.playlist.trackCount)
-            {   
+            {
                 // 如果歌单的歌曲数量小于50，那么查询的数量就是歌曲的数量，否则查询的数量就是歌曲的数量减去50乘以查询的次数
                 i = gedanDetail.playlist.trackCount < 50 ? gedanDetail.playlist.trackCount : gedanDetail.playlist.trackCount - 50 * loopCount;
                 // 构建查询URL，如果歌单的歌曲数量小于50，那么偏移量就是0，否则偏移量就是查询的数量
@@ -241,7 +249,7 @@ public class AudioPlugin : IBotPlugin
                 urlSearch = $"{neteaseMusicAPI}/playlist/track/all?id={arguments}&limit=50&offset={offset}";
                 searchJson = await HttpGetAsync(urlSearch);
                 GeDan geDan1 = JsonSerializer.Deserialize<GeDan>(searchJson);
-                for (int j = 0; j < i; j++){
+                for (int j = 0; j < i; j++) {
                     playlist.Add(geDan1.songs[j].id);
                     Console.WriteLine(geDan1.songs[j].id);
                 }
@@ -250,7 +258,7 @@ public class AudioPlugin : IBotPlugin
             urlSearch = $"{neteaseMusicAPI}/playlist/track/all?id={arguments}&limit=50&offset={i}";
             searchJson = await HttpGetAsync(urlSearch);
             GeDan geDan = JsonSerializer.Deserialize<GeDan>(searchJson);
-            for (int j = 0; j < 50; j++){
+            for (int j = 0; j < 50; j++) {
                 playlist.Add(geDan.songs[j].id);
                 Console.WriteLine(geDan.songs[j].id);
             }
@@ -259,7 +267,7 @@ public class AudioPlugin : IBotPlugin
         _ = ProcessSong(playlist[0], ts3Client, playManager, invoker);
         Console.WriteLine($"歌单共{playlist.Count}首歌");
         await Listeninglock.WaitAsync();
-        playManager.ResourceStopped += async (sender, e) => await SongPlayMode(playManager, invoker, ts3Client, "netease");
+        playManager.ResourceStopped += async (sender, e) => await SongPlayMode(playManager, invoker, ts3Client);
         return $"播放列表加载完成,已加载{playlist.Count}首歌";
     }
 
@@ -274,7 +282,7 @@ public class AudioPlugin : IBotPlugin
         string searchJson = await HttpGetAsync(urlSearch);
         RootObject gedanDetail = JsonSerializer.Deserialize<RootObject>(searchJson);
         Console.WriteLine(gedanDetail.Result);
-        if(gedanDetail.Result == 100)
+        if (gedanDetail.Result == 100)
         {
             string gedanshuliang = gedanDetail.Data.Songnum.ToString();
             _ = ts3Client.SendChannelMessage($"歌单共{gedanshuliang}首歌曲，正在添加到播放列表,请稍后。");
@@ -286,9 +294,9 @@ public class AudioPlugin : IBotPlugin
             }
             Playlocation = 0;
             _ = PlaySongs(qqplayList[0], ts3Client, playManager, invoker);
-            Console.WriteLine($"歌单共{playlist.Count}首歌");
-            await Listeninglock.WaitAsync();
-            playManager.ResourceStopped += async (sender, e) => await SongPlayMode(playManager, invoker, ts3Client, "qq");
+            Console.WriteLine($"歌单共{qqplayList.Count}首歌");
+            await QQListeninglock.WaitAsync();
+            playManager.ResourceStopped += async (sender, e) => await QQSongPlayMode(playManager, invoker, ts3Client);
             return $"播放列表加载完成,已加载{qqplayList.Count}首歌";
         }
         else
@@ -303,8 +311,14 @@ public class AudioPlugin : IBotPlugin
     [Command("yun next")]
     public async Task CommandYunNext(PlayManager playManager, InvokerData invoker, Ts3Client ts3Client)
     {
-        await SongPlayMode(playManager, invoker, ts3Client, "netease");
+        await SongPlayMode(playManager, invoker, ts3Client);
     }
+    [Command("qq next")]
+    public async Task CommandQQNext(PlayManager playManager, InvokerData invoker, Ts3Client ts3Client)
+    {
+        await QQSongPlayMode(playManager, invoker, ts3Client);
+    }
+
     //===========================================下一曲=============================================
     [Command("yun stop")]
     public async Task CommandYunStop(PlayManager playManager, Ts3Client ts3Client)
@@ -313,100 +327,102 @@ public class AudioPlugin : IBotPlugin
         await playManager.Stop();
     }
 
-    //===========================================播放逻辑===========================================
-    private async Task SongPlayMode(PlayManager playManager, InvokerData invoker, Ts3Client ts3Client, string songPlat)
+    [Command("qq stop")]
+    public async Task CommandQQStop(PlayManager playManager, Ts3Client ts3Client)
     {
-        if (songPlat == "netease")
+        qqplayList.Clear();
+        await playManager.Stop();
+    }
+    //===========================================播放逻辑===========================================
+    private async Task SongPlayMode(PlayManager playManager, InvokerData invoker, Ts3Client ts3Client)
+    {
+        try
         {
-            List<long> playList = new List<long>();
-            playList = playlist;
-            try
+            Console.WriteLine(playMode);
+            switch (playMode)
             {
-
-                switch (playMode)
-                {
-                    case 0: //顺序播放
+                case 0: //顺序播放
+                    Playlocation += 1;
+                    await ProcessSong(playlist[Playlocation], ts3Client, playManager, invoker);
+                    break;
+                case 1:  //顺序循环
+                    if (Playlocation == playlist.Count - 1)
+                    {
+                        Playlocation = 0;
+                        await ProcessSong(playlist[Playlocation], ts3Client, playManager, invoker);
+                    }
+                    else
+                    {
                         Playlocation += 1;
-                        await ProcessSong(playList[Playlocation], ts3Client, playManager, invoker);
-                        break;
-                    case 1:  //顺序循环
-                        if (Playlocation == playList.Count - 1)
-                        {
-                            Playlocation = 0;
-                            await ProcessSong(playList[Playlocation], ts3Client, playManager, invoker);
-                        }
-                        else
-                        {
-                            Playlocation += 1;
-                            await ProcessSong(playList[Playlocation], ts3Client, playManager, invoker);
-                        }
-                        break;
-                    case 2:  //随机播放
-                        Random random = new Random();
-                        Playlocation = random.Next(0, playList.Count);
-                        await ProcessSong(playList[Playlocation], ts3Client, playManager, invoker);
-                        break;
-                    case 3:  //随机循环
-                        Random random1 = new Random();
-                        Playlocation = random1.Next(0, playList.Count);
-                        await ProcessSong(playList[Playlocation], ts3Client, playManager, invoker);
-                        break;
-                    default:
-                        break;
-                }
-            }
-            catch (Exception)
-            {
-                Console.WriteLine("播放列表已空");
-                _ = ts3Client.SendChannelMessage("已停止播放");
+                        await ProcessSong(playlist[Playlocation], ts3Client, playManager, invoker);
+                    }
+                    break;
+                case 2:  //随机播放
+                    Random random = new Random();
+                    Playlocation = random.Next(0, playlist.Count);
+                    await ProcessSong(playlist[Playlocation], ts3Client, playManager, invoker);
+                    break;
+                case 3:  //随机循环
+                    Random random1 = new Random();
+                    Playlocation = random1.Next(0, playlist.Count);
+                    await ProcessSong(playlist[Playlocation], ts3Client, playManager, invoker);
+                    break;
+                default:
+                    Console.WriteLine("DEFAULT");
+                    break;
             }
         }
-        else
+        catch (Exception)
         {
-            List<string> playList = new List<string>();
-            playList = qqplayList;
-            try
-            {
+            Console.WriteLine("播放列表已空");
+            _ = ts3Client.SendChannelMessage("已停止播放");
+        }
 
-                switch (playMode)
-                {
-                    case 0: //顺序播放
-                        Playlocation += 1;
-                        await PlaySongs(playList[Playlocation], ts3Client, playManager, invoker);
-                        break;
-                    case 1:  //顺序循环
-                        if (Playlocation == playList.Count - 1)
-                        {
-                            Playlocation = 0;
-                            await PlaySongs(playList[Playlocation], ts3Client, playManager, invoker);
-                        }
-                        else
-                        {
-                            Playlocation += 1;
-                            await PlaySongs(playList[Playlocation], ts3Client, playManager, invoker);
-                        }
-                        break;
-                    case 2:  //随机播放
-                        Random random = new Random();
-                        Playlocation = random.Next(0, playList.Count);
-                        await PlaySongs(playList[Playlocation], ts3Client, playManager, invoker);
-                        break;
-                    case 3:  //随机循环
-                        Random random1 = new Random();
-                        Playlocation = random1.Next(0, playList.Count);
-                        await PlaySongs(playList[Playlocation], ts3Client, playManager, invoker);
-                        break;
-                    default:
-                        break;
-                }
-            }
-            catch (Exception)
+
+    }
+    private async Task QQSongPlayMode(PlayManager playManager, InvokerData invoker, Ts3Client ts3Client)
+    {
+        try
+        {
+            switch (playMode)
             {
-                Console.WriteLine("播放列表已空");
-                _ = ts3Client.SendChannelMessage("已停止播放");
+            case 0: //顺序播放
+                Playlocation += 1;
+                await PlaySongs(qqplayList[Playlocation], ts3Client, playManager, invoker);
+                break;
+            case 1:  //顺序循环
+                if (Playlocation == qqplayList.Count - 1)
+                {
+                    Playlocation = 0;
+                    await PlaySongs(qqplayList[Playlocation], ts3Client, playManager, invoker);
+                }
+                else
+                {
+                    Playlocation += 1;
+                    await PlaySongs(qqplayList[Playlocation], ts3Client, playManager, invoker);
+                }
+                break;
+            case 2:  //随机播放
+                Random random = new Random();
+                Playlocation = random.Next(0, qqplayList.Count);
+                await PlaySongs(qqplayList[Playlocation], ts3Client, playManager, invoker);
+                break;
+            case 3:  //随机循环
+                Random random1 = new Random();
+                Playlocation = random1.Next(0, qqplayList.Count);
+                await PlaySongs(qqplayList[Playlocation], ts3Client, playManager, invoker);
+                break;
+            default:
+                Playlocation += 1;
+                await PlaySongs(qqplayList[Playlocation], ts3Client, playManager, invoker);
+                break;
             }
         }
-        
+        catch (Exception)
+        {
+            Console.WriteLine("播放列表已空");
+            _ = ts3Client.SendChannelMessage("已停止播放");
+        }
     }
 
 /*    private async Task ProcessSong(object value, Ts3Client ts3Client, PlayManager playManager, InvokerData invoker)
@@ -474,24 +490,21 @@ public class AudioPlugin : IBotPlugin
     // qq music
     private async Task PlaySongs(string id, Ts3Client ts3Client, PlayManager playManager, InvokerData invoker)
     {
-        await playlock.WaitAsync();
+        await QQplaylock.WaitAsync();
         string MusicUrl = "error";
         try
         {
             string musicId = id;
-            string musicCheckUrl = $"{qqMusicAPI}/song?songmid={musicId}";
+            string musicCheckUrl = $"{qqMusicAPI}/song/url?id={musicId}";
             string searchMusicCheckJson = await HttpGetAsync(musicCheckUrl);
             var trackUrlResponse = JsonSerializer.Deserialize<TrackUrlResponse>(searchMusicCheckJson);
             // 获取播放URL
-            if (trackUrlResponse != null && trackUrlResponse.Result == 100)
+            /*if (trackUrlResponse != null && trackUrlResponse.Result == 100)
             {
-                foreach (var item in trackUrlResponse.Data)
-                {
-                    MusicUrl = item.Key;
-                    Console.WriteLine($"Key: {item.Key}, URL: {item.Value}");
-                }
-                Console.WriteLine($"Result: {trackUrlResponse.Result}");
-            }
+                    MusicUrl = trackUrlResponse.Data;
+                    Console.WriteLine($"Result: {trackUrlResponse.Result}");
+            }*/
+            MusicUrl = trackUrlResponse.Data;
 
             // 构造获取音乐详情的URL
             string musicDetailUrl = $"{qqMusicAPI}/song?songmid={musicId}";
@@ -528,12 +541,20 @@ public class AudioPlugin : IBotPlugin
                 {
                     _ = ts3Client.SendChannelMessage($"正在播放第{Playlocation + 1}首：{musicName}");
                 }
+            }else if(MusicUrl == "" || MusicUrl == "error"){
+                _ = ts3Client.SendChannelMessage($"歌曲《{musicName}》播放失败");
+                await PlaySongs(qqplayList[Playlocation + 1], ts3Client, playManager, invoker);
+            }
+            else
+            {
+                _ = ts3Client.SendChannelMessage($"歌曲《{musicName}》未知错误");
+                await PlaySongs(qqplayList[Playlocation + 1], ts3Client, playManager, invoker);
             }
 
         }
         finally
         {
-
+            QQplaylock.Release();
         }
     }
 

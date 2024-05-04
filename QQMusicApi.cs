@@ -99,7 +99,7 @@ namespace QQMusicApi
         public int Isdj { get; set; }
 
         [JsonPropertyName("tags")]
-        public int[] Tags { get; set; }
+        public TAGS[] Tags { get; set; }
 
         [JsonPropertyName("songnum")]
         public int Songnum { get; set; }
@@ -150,6 +150,15 @@ namespace QQMusicApi
         public int Scoreusercount { get; set; }
     }
 
+    public class TAGS
+    {
+        [JsonPropertyName("id")]
+        public int Id { get; set; }
+        [JsonPropertyName("name")]
+        public string Name { get; set; }
+        [JsonPropertyName("pid")]
+        public int Pid { get; set; }
+    }
     public class Song
     {
         [JsonPropertyName("albumdesc")]
@@ -761,7 +770,7 @@ namespace QQMusicApi
     public class TrackUrlResponse
     {
         [JsonPropertyName("data")]
-        public Dictionary<string, string> Data { get; set; }
+        public string Data { get; set; }
 
         [JsonPropertyName("result")]
         public int Result { get; set; }
