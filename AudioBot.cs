@@ -541,7 +541,7 @@ public class AudioPlugin : IBotPlugin
                 {
                     _ = ts3Client.SendChannelMessage($"正在播放第{Playlocation + 1}首：{musicName}");
                 }
-            }else if(MusicUrl == "" || MusicUrl == "error"){
+            }else if(MusicUrl == "" || MusicUrl == "error" || MusicUrl == " "){
                 _ = ts3Client.SendChannelMessage($"歌曲《{musicName}》播放失败");
                 await PlaySongs(qqplayList[Playlocation + 1], ts3Client, playManager, invoker);
             }
