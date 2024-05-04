@@ -497,7 +497,7 @@ public class AudioPlugin : IBotPlugin
             string musicId = id;
             string musicCheckUrl = $"{qqMusicAPI}/song/url?id={musicId}";
             string searchMusicCheckJson = await HttpGetAsync(musicCheckUrl);
-            var trackUrlResponse = JsonSerializer.Deserialize<TrackUrlResponse>(searchMusicCheckJson);
+            TrackUrlResponse trackUrlResponse = JsonSerializer.Deserialize<TrackUrlResponse>(searchMusicCheckJson);
             // 获取播放URL
             /*if (trackUrlResponse != null && trackUrlResponse.Result == 100)
             {
@@ -505,7 +505,7 @@ public class AudioPlugin : IBotPlugin
                     Console.WriteLine($"Result: {trackUrlResponse.Result}");
             }*/
             MusicUrl = trackUrlResponse.Data;
-
+            Console.WriteLine(trackUrlResponse);
             // 构造获取音乐详情的URL
             string musicDetailUrl = $"{qqMusicAPI}/song?songmid={musicId}";
             string musicDetailJson = await HttpGetAsync(musicDetailUrl);
