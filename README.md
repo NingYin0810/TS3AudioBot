@@ -1,16 +1,22 @@
-# TS3AudioBot-NetEaseCloudmusic-UNM
-TS3AudioBot-NetEaseCloudmusic-UnblockNeteaseMusic-plugin
-
+# TS3AudioBot
 支持Windows、Linux、Docker环境。
 
 ## 关于解锁版权歌曲
 需要在自建的 [NeteaseCloudMusicApi](https://github.com/Binaryify/NeteaseCloudMusicApi)（推荐Docker版）里面的 app.js 中添加 `process.env['NODE_TLS_REJECT_UNAUTHORIZED'] = 0`, 如果是docker版的话就在环境里面添加`NODE_TLS_REJECT_UNAUTHORIZED = 0`。  
 需要自建 [UnblockNeteaseMusic](https://github.com/UnblockNeteaseMusic/server) 服务（推荐Docker版）。
 
-## 关于设置文件YunSettings.ini
+## 关于设置文件Settings.ini
 `playMode=`是播放模式   
-`WangYiYunAPI_Address=`是网易云API地址   
-`cookies1=`是保存在你本地的身份验证，通过二维码登录获取。（不需要修改）   
+`NeteaseMusic_API=`是网易云API地址   
+
+`QQMusic_API=`是QQ音乐的API地址
+
+`neteaseCookies=`是保存在你本地的身份验证，通过二维码登录获取。（不需要修改）   
+
+`qqCookie=`是QQ音乐的cookie，需要在QQ音乐官网登录并复制添加（需要修改）
+
+`qq=`是QQ音乐cookie对应的QQ号
+
 `UNM_Address=`是 UnblockNeteaseMusic 服务的API地址。    
 
 ## 替换插件文件后需要重启TS3AudioBot服务！！！
@@ -23,7 +29,7 @@ vip音乐想要先登陆才能播放完整版本:（输入指令后扫描机器�
 双击机器人，目前有以下指令
 1.立即播放网易云音乐  
 `!yun play 音乐名称` 或 `!yun play 音乐名称 歌手` (无版权歌曲点播)  
-  
+
 2.播放网易云音乐歌单    
 `!yun gedan 歌单id`  
 
@@ -38,7 +44,15 @@ vip音乐想要先登陆才能播放完整版本:（输入指令后扫描机器�
 `0 = 顺序播放`    
 `1 = 顺序循环`    
 `2 = 随机播放`    
-`3 = 随机循环`    
+`3 = 随机循环`
+
+6. QQ部分
+
+`!qq login` 填入QQCookie后登录命令
+
+`!qq gd <id>` 添加qq歌单
+
+`!qq next` QQ音乐下一首
 
 
 ## 如果你需要基于主线[TS3AudioBot](https://github.com/Splamy/TS3AudioBot)构建Docker版的TS3AudioBot：   
@@ -59,3 +73,4 @@ Dockerfile支持x86、arm64、arm32三种架构，默认为x86。 如需其他�
 - [Fody](https://github.com/Fody) 的 [Costura.Fody](https://github.com/Fody/Costura/) 项目   
 - [ZHANGTIANYAO1](https://github.com/ZHANGTIANYAO1) 的 [TS3AudioBot-NetEaseCloudmusic-plugin](https://github.com/ZHANGTIANYAO1/TS3AudioBot-NetEaseCloudmusic-plugin) 项目   
 - [lauren12133](https://github.com/lauren12133) 关于TS3AudioBot编译Docker的教程和代码。
+- [FiveHair](https://github.com/FiveHair) 的[TS3AudioBot-NetEaseCloudmusic-plugin-UNM](https://github.com/FiveHair/TS3AudioBot-NetEaseCloudmusic-plugin-UNM)项目
